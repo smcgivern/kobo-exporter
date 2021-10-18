@@ -41,8 +41,8 @@ func PriceToFloat(data string) (bool, float64) {
 	return true, price
 }
 
-func findPrice(url string) (ok bool, price float64) {
-	z := html.NewTokenizer(fetchBook(url))
+func FindPrice(page io.ReadCloser) (ok bool, price float64) {
+	z := html.NewTokenizer(page)
 	inWrapper := false
 	inPrice := false
 	depth := 0
@@ -79,7 +79,7 @@ func findPrice(url string) (ok bool, price float64) {
 }
 
 func main() {
-	ok, price := findPrice("https://www.kobo.com/gb/en/ebook/warlock-8")
+	ok, price := FindPrice(fetchBook("https://www.kobo.com/gb/en/ebook/warlock-8"))
 
 	if ok {
 		fmt.Println(price)
