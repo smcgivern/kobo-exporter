@@ -1,13 +1,22 @@
 package main
 
 import (
-	"fmt"
 	"golang.org/x/net/html"
 	"io"
 	"log"
 	"net/http"
 	"regexp"
 	"strconv"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+var (
+	koboPrice = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "kobo_price",
+		Help: "Current price of the book.",
+	}, []string{"book"})
 )
 
 func fetchBook(url string) io.ReadCloser {
@@ -78,12 +87,17 @@ func FindPrice(page io.ReadCloser) (ok bool, price float64) {
 	return
 }
 
+func init() {
+	prometheus.MustRegister(koboPrice)
+}
+
 func main() {
 	ok, price := FindPrice(fetchBook("https://www.kobo.com/gb/en/ebook/warlock-8"))
 
 	if ok {
-		fmt.Println(price)
-	} else {
-		fmt.Println(price)
+		koboPrice.With(prometheus.Labels{"book": "Warlock"}).Set(price)
 	}
+
+	http.Handle("/metrics", promhttp.Handler())
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
