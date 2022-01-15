@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -16,8 +17,14 @@ var (
 	koboPrice = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "kobo_price",
 		Help: "Current price of the book.",
-	}, []string{"book"})
+	}, []string{"title", "author"})
 )
+
+type BookInfo struct {
+	price  float64
+	title  string
+	author string
+}
 
 func fetchBook(url string) io.ReadCloser {
 	response, err := http.Get(url)
@@ -31,8 +38,12 @@ func fetchBook(url string) io.ReadCloser {
 
 func hasClass(token html.Token, value string) bool {
 	for _, attr := range token.Attr {
-		if attr.Key == "class" && attr.Val == value {
-			return true
+		if attr.Key == "class" {
+			for _, class := range strings.Fields(attr.Val) {
+				if class == value {
+					return true
+				}
+			}
 		}
 	}
 
@@ -50,9 +61,13 @@ func PriceToFloat(data string) (bool, float64) {
 	return true, price
 }
 
-func FindPrice(page io.ReadCloser) (ok bool, price float64) {
+func FindInfo(page io.ReadCloser) (ok bool, info BookInfo) {
 	z := html.NewTokenizer(page)
+	title := ""
+	author := ""
 	inWrapper := false
+	inTitle := false
+	inAuthor := false
 	inPrice := false
 	depth := 0
 
@@ -64,8 +79,8 @@ func FindPrice(page io.ReadCloser) (ok bool, price float64) {
 			return
 		case html.StartTagToken, html.EndTagToken:
 			t := z.Token()
-
 			if inWrapper {
+
 				if tt == html.EndTagToken {
 					depth--
 					inWrapper = depth > 0
@@ -73,13 +88,28 @@ func FindPrice(page io.ReadCloser) (ok bool, price float64) {
 					depth++
 				}
 
+				inTitle = t.Data == "h2" && hasClass(t, "title")
+				inAuthor = t.Data == "a" && hasClass(t, "contributor-name")
 				inPrice = t.Data == "span" && hasClass(t, "price")
 			} else {
-				inWrapper = t.Data == "div" && hasClass(t, "active-price")
+				if t.Data == "div" && (hasClass(t, "item-info") || hasClass(t, "active-price")) {
+					inWrapper = true
+					depth = 1
+				}
 			}
 		case html.TextToken:
-			if inPrice {
-				return PriceToFloat(z.Token().Data)
+			if inTitle && title == "" {
+				title = strings.TrimSpace(z.Token().Data)
+			} else if inAuthor && author == "" {
+				author = z.Token().Data
+			} else if inPrice {
+				priceOK, price := PriceToFloat(z.Token().Data)
+
+				if priceOK {
+					return priceOK, BookInfo{title: title, author: author, price: price}
+				} else {
+					return
+				}
 			}
 		}
 	}
@@ -92,10 +122,10 @@ func init() {
 }
 
 func main() {
-	ok, price := FindPrice(fetchBook("https://www.kobo.com/gb/en/ebook/warlock-8"))
+	ok, info := FindInfo(fetchBook("https://www.kobo.com/gb/en/ebook/warlock-8"))
 
 	if ok {
-		koboPrice.With(prometheus.Labels{"book": "Warlock"}).Set(price)
+		koboPrice.With(prometheus.Labels{"title": info.title, "author": info.author}).Set(info.price)
 	}
 
 	http.Handle("/metrics", promhttp.Handler())

@@ -32,18 +32,29 @@ func TestPriceToFloat(t *testing.T) {
 	}
 }
 
-func TestFindPrice(t *testing.T) {
+func TestFindInfo(t *testing.T) {
 	cases := []struct {
 		file     string
 		ok       bool
-		expected float64
+		expected BookInfo
 	}{
-		{"warlock-gb", true, 9.89},
-		{"warlock-es", true, 11.95},
-		{"warlock-ca", true, 13.59},
-		{"warlock-au", true, 22.76},
-		{"empty-file", false, 0},
-		{"pride-and-prejudice-free", false, 0},
+		// Multiple currencies
+		{"warlock-gb", true, BookInfo{price: 9.89, title: "Warlock", author: "Oakley Hall"}},
+		{"warlock-es", true, BookInfo{price: 11.95, title: "Warlock", author: "Oakley Hall"}},
+		{"warlock-ca", true, BookInfo{price: 13.59, title: "Warlock", author: "Oakley Hall"}},
+		{"warlock-au", true, BookInfo{price: 22.76, title: "Warlock", author: "Oakley Hall"}},
+
+		// No author
+		{"broken-stars", true, BookInfo{price: 3.99, title: "Broken Stars", author: ""}},
+
+		// Multiple authors
+		{"a-memory-of-light", true, BookInfo{price: 6.99, title: "A Memory Of Light", author: "Robert Jordan"}},
+
+		// Cannot be parsed as HTML
+		{"empty-file", false, BookInfo{price: 0, title: "", author: ""}},
+
+		// Can't read price
+		{"pride-and-prejudice-free", false, BookInfo{price: 0, title: "", author: ""}},
 	}
 	for _, c := range cases {
 		fixture, err := os.Open("testdata/" + c.file)
@@ -52,12 +63,12 @@ func TestFindPrice(t *testing.T) {
 			log.Fatal(err)
 		}
 
-		ok, price := FindPrice(fixture)
+		ok, info := FindInfo(fixture)
 		if ok != c.ok {
-			t.Errorf("FindPrice(file:%q) == %v, _, want %v", c.file, ok, c.ok)
+			t.Errorf("FindInfo(file:%q) == %v, _, want %v", c.file, ok, c.ok)
 		}
-		if price != c.expected {
-			t.Errorf("FindPrice(file:%q) == _, %v, want %v", c.file, price, c.expected)
+		if info != c.expected {
+			t.Errorf("FindInfo(file:%q) == _, %v, want %v", c.file, info, c.expected)
 		}
 	}
 }
