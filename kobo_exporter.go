@@ -128,10 +128,12 @@ func main() {
 
 	flag.Parse()
 
-	ok, info := FindInfo(fetchBook("https://www.kobo.com/gb/en/ebook/warlock-8"))
+	for _, url := range flag.Args() {
+		ok, info := FindInfo(fetchBook(url))
 
-	if ok {
-		koboPrice.With(prometheus.Labels{"title": info.title, "author": info.author}).Set(info.price)
+		if ok {
+			koboPrice.With(prometheus.Labels{"title": info.title, "author": info.author}).Set(info.price)
+		}
 	}
 
 	http.Handle("/metrics", promhttp.Handler())
