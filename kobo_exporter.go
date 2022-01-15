@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"golang.org/x/net/html"
 	"io"
 	"log"
@@ -122,6 +124,10 @@ func init() {
 }
 
 func main() {
+	port := flag.Int("port", 8080, "Port for metrics server")
+
+	flag.Parse()
+
 	ok, info := FindInfo(fetchBook("https://www.kobo.com/gb/en/ebook/warlock-8"))
 
 	if ok {
@@ -129,5 +135,5 @@ func main() {
 	}
 
 	http.Handle("/metrics", promhttp.Handler())
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
 }
