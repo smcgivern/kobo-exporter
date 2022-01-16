@@ -20,6 +20,11 @@ var (
 		Name: "kobo_price",
 		Help: "Current price of the book.",
 	}, []string{"title", "author"})
+	koboScrapes = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "kobo_scrapes",
+		Help: "Number of scrapes for this book.",
+	}, []string{"title", "author"})
+
 )
 
 type BookInfo struct {
@@ -119,8 +124,18 @@ func FindInfo(page io.ReadCloser) (ok bool, info BookInfo) {
 	return
 }
 
+func scrape(url string) {
+	ok, info := FindInfo(fetchBook(url))
+
+	if ok {
+		koboPrice.With(prometheus.Labels{"title": info.title, "author": info.author}).Set(info.price)
+		koboScrapes.With(prometheus.Labels{"title": info.title, "author": info.author}).Inc()
+	}
+}
+
 func init() {
 	prometheus.MustRegister(koboPrice)
+	prometheus.MustRegister(koboScrapes)
 }
 
 func main() {
@@ -129,11 +144,7 @@ func main() {
 	flag.Parse()
 
 	for _, url := range flag.Args() {
-		ok, info := FindInfo(fetchBook(url))
-
-		if ok {
-			koboPrice.With(prometheus.Labels{"title": info.title, "author": info.author}).Set(info.price)
-		}
+		scrape(url)
 	}
 
 	http.Handle("/metrics", promhttp.Handler())
