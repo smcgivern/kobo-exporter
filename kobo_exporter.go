@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -24,7 +25,6 @@ var (
 		Name: "kobo_scrapes",
 		Help: "Number of scrapes for this book.",
 	}, []string{"title", "author"})
-
 )
 
 type BookInfo struct {
@@ -133,6 +133,24 @@ func scrape(url string) {
 	}
 }
 
+func tick(frequency time.Duration, urls []string) {
+	ticker := time.NewTicker(frequency)
+	i := 0
+	done := make(chan bool)
+
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				scrape(urls[i])
+				i = (i + 1) % len(urls)
+			}
+		}
+	}()
+}
+
 func init() {
 	prometheus.MustRegister(koboPrice)
 	prometheus.MustRegister(koboScrapes)
@@ -140,12 +158,11 @@ func init() {
 
 func main() {
 	port := flag.Int("port", 8080, "Port for metrics server")
+	frequency := flag.Int("frequency", 600, "Scrape frequency in seconds")
 
 	flag.Parse()
 
-	for _, url := range flag.Args() {
-		scrape(url)
-	}
+	tick(time.Duration(*frequency)*time.Second, flag.Args())
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
