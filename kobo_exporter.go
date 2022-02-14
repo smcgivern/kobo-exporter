@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"golang.org/x/net/html"
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -133,6 +135,26 @@ func scrape(url string) {
 	}
 }
 
+func readConfig(path string) (urls []string) {
+	file, err := os.Open(path)
+
+	if err != nil {
+		log.Fatal("Reading ", path, ": ", err)
+	}
+
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		urls = append(urls, scanner.Text())
+	}
+
+	if err = scanner.Err(); err != nil {
+		log.Fatal("Reading ", path, ": ", err)
+	}
+
+	return urls
+}
+
 func tick(frequency time.Duration, urls []string) {
 	ticker := time.NewTicker(frequency)
 	i := 0
@@ -159,10 +181,18 @@ func init() {
 func main() {
 	port := flag.Int("port", 8080, "Port for metrics server")
 	frequency := flag.Int("frequency", 600, "Scrape frequency in seconds")
+	configFile := flag.String("config", "", "Config file (line-delimited URLs)")
+	urls := []string{}
 
 	flag.Parse()
 
-	tick(time.Duration(*frequency)*time.Second, flag.Args())
+	if *configFile != "" {
+		urls = readConfig(*configFile)
+	} else {
+		urls = flag.Args()
+	}
+
+	tick(time.Duration(*frequency)*time.Second, urls)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
