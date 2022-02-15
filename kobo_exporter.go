@@ -194,6 +194,86 @@ func main() {
 
 	tick(time.Duration(*frequency)*time.Second, urls)
 
+	http.HandleFunc("/", index)
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
+}
+
+// Last because of the large HTML string literal.
+func index(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, `
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Kobo exporter</title>
+    <style type="text/css">
+      body, input {
+	font-family: "Palatino Linotype", "Palatino", "URW Palladio L", "Book Antiqua", "Baskerville", "Bitstream Charter", "Garamond", "Georgia", serif;
+	font-size: 105%;
+	color: #000;
+	background: #fff;
+      }
+
+      body {
+	line-height: 1.6;
+	width: 50em;
+	margin: 0em auto;
+      }
+
+      h1, h2, h3, h4, h5, h6 {
+	font-family: "Gill Sans", "Gill Sans MT", "GillSans", "Calibri", "Trebuchet MS", sans-serif;
+	text-align: center;
+	font-weight: normal;
+      }
+
+      :link,:link:active,:link:hover, .click {
+	color: #0000ff;
+	background: transparent;
+	cursor: pointer;
+	text-decoration: underline;
+      }
+
+      :link:visited {
+	color: #800080;
+	background: transparent;
+      }
+
+      #byline {
+	clear: both;
+	text-align: right;
+	font-size: 75%;
+	font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Kobo exporter</h1>
+    <p>
+      This is a <a href="https://prometheus.io">Prometheus</a> exporter
+      for <a href="https://www.kobo.com">Kobo ebook prices</a>. It
+      exports a Prometheus
+      <a href="https://prometheus.io/docs/concepts/metric_types/#gauge">gauge</a>
+      for a set of books with their current price, and scrapes each
+      book's price periodically to update the gauge.
+    </p>
+    <p>
+      The metrics for my list of books are available at
+      <a href="./metrics"><code>./metrics</code></a>.
+      I use it in conjunction with
+      <a href="https://prometheus.io/docs/alerting/latest/alertmanager/">Alertmanager</a>
+      to provide alerts when Kobo books I'm interested in go on sale.
+    </p>
+    <p>
+      The <a href="https://github.com/smcgivern/kobo-exporter">source
+      is on GitHub</a>.
+    </p>
+    <div id="byline">
+      <p>
+	By
+	<a href="http://sean.mcgivern.me.uk/">Sean McGivern</a>
+      </p>
+    </div>
+  </body>
+</html>
+`)
 }
