@@ -1,3 +1,7 @@
+# Config
 *.conf
 *.mk
 *.service
+
+# Artifacts
+kobo_exporter*
