@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"golang.org/x/net/html"
@@ -35,14 +36,25 @@ type BookInfo struct {
 	author string
 }
 
-func fetchBook(url string) io.ReadCloser {
-	response, err := http.Get(url)
+func fetchBook(url string) (bool, io.ReadCloser) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+	defer cancel()
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Creating request for", url, ":", err)
 	}
 
-	return response.Body
+	response, err := http.DefaultClient.Do(request)
+
+	if err != nil {
+		log.Println("Request for", url, ":", err)
+		return false, nil
+	}
+
+	return true, response.Body
 }
 
 func hasClass(token html.Token, value string) bool {
@@ -127,11 +139,15 @@ func FindInfo(page io.ReadCloser) (ok bool, info BookInfo) {
 }
 
 func scrape(url string) {
-	ok, info := FindInfo(fetchBook(url))
+	ok, body := fetchBook(url)
 
 	if ok {
-		koboPrice.With(prometheus.Labels{"title": info.title, "author": info.author}).Set(info.price)
-		koboScrapes.With(prometheus.Labels{"title": info.title, "author": info.author}).Inc()
+		ok, info := FindInfo(body)
+
+		if ok {
+			koboPrice.With(prometheus.Labels{"title": info.title, "author": info.author}).Set(info.price)
+			koboScrapes.With(prometheus.Labels{"title": info.title, "author": info.author}).Inc()
+		}
 	}
 }
 
@@ -139,7 +155,7 @@ func readConfig(path string) (urls []string) {
 	file, err := os.Open(path)
 
 	if err != nil {
-		log.Fatal("Reading ", path, ": ", err)
+		log.Fatal("Reading", path, ":", err)
 	}
 
 	scanner := bufio.NewScanner(file)
@@ -149,7 +165,7 @@ func readConfig(path string) (urls []string) {
 	}
 
 	if err = scanner.Err(); err != nil {
-		log.Fatal("Reading ", path, ": ", err)
+		log.Fatal("Reading", path, ":", err)
 	}
 
 	return urls
