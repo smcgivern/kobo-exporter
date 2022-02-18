@@ -5,6 +5,16 @@ A [Prometheus exporter] for [Kobo store] prices.
 [Prometheus exporter]: https://prometheus.io/docs/instrumenting/exporters/
 [Kobo store]: https://www.kobo.com/gb/en/ebooks
 
+## :-(
+
+Unfortunately, this does not work for me: I get put into a [tarpit] by
+the Kobo store. I can work around it locally with custom headers, but on
+the server I want to run this on, no `curl` command I've tried works -
+which I assume is because there's a source IP component to those rules
+:-(
+
+[tarpit]: https://community.akamai.com/customers/s/question/0D54R00007GjCANSA3/why-does-akamai-edge-services-sometime-just-not-send-any-response-leaving-the-connection-to-timeout
+
 ## Set up
 
 ```shell
